@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -21,7 +22,7 @@ type Tokenizer struct {
 	tokcol          int64    // : 0,
 	newline_before  bool     // : false,
 	regex_allowed   bool     // : false,
-	comments_before []string //
+	comments_before []*token //
 }
 
 func NewTokenizer(str string) *Tokenizer {
@@ -89,7 +90,7 @@ type token struct {
 	pos             int64  //: t.tokpos,
 	endpos          int64  //: t.pos,
 	nlb             bool   // : t.newline_before
-	comments_before []string
+	comments_before []*token
 }
 
 func (t *Tokenizer) token(tp string, value string, is_comment bool) *token {
@@ -107,7 +108,7 @@ func (t *Tokenizer) token(tp string, value string, is_comment bool) *token {
 	}
 	if (!is_comment) {
 		ret.comments_before = t.comments_before
-		t.comments_before = []string{}
+		t.comments_before = []*token{}
 		// make note of any newlines in the comments that came before
 		//for (var i = 0, len = ret.comments_before.length i < len i++) {
 		//ret.nlb = ret.nlb || ret.comments_before[i].nlb
@@ -218,9 +219,9 @@ func (t *Tokenizer) read_escaped_char(in_string bool) string {
 	case "0":
 		return "\0"
 	case "x":
-		return strings.fromCharCode(t.hex_bytes(2))
+		return string(t.hex_bytes(2))
 	case "u":
-		return strings.fromCharCode(t.hex_bytes(4))
+		return string(t.hex_bytes(4))
 	case "\n":
 		return ""
 	default:
@@ -230,12 +231,13 @@ func (t *Tokenizer) read_escaped_char(in_string bool) string {
 
 func (t *Tokenizer) hex_bytes(n int) int64 {
 	var num int64 = 0
-	for
-	(n > 0 --
-	n) {
-		var digit = parseInt(t.next(true, false), 16)
-		if (isNaN(digit))
-			parse_error("Invalid hex-character pattern in string")
+	for ; n > 0; n-- {
+
+		digit, err := strconv.ParseInt(t.next(true, false), 2, 16)
+
+		if err != nil {
+			log.Panic("Invalid hex-character pattern in string")
+		}
 		num = (num << 4) | digit
 	}
 	return num
@@ -271,7 +273,7 @@ func (t *Tokenizer) read_string() *token {
 					return false
 				})
 				if (octal_len > 0) {
-					ch = String.fromCharCode(parseInt(ch, 8))
+					ch = string(parseInt(ch, 8))
 				} else {
 					ch = t.read_escaped_char(true)
 				}
@@ -292,10 +294,10 @@ func (t *Tokenizer) read_line_comment() *token {
 	i := t.find("\n")
 	ret := ""
 	if (i == -1) {
-		ret = t.text.substr(t.pos)
-		t.pos = t.text.length
+		ret = t.text[t.pos:]
+		t.pos = int64(len(t.text))
 	} else {
-		ret = t.text.substring(S.pos, i)
+		ret = t.text[t.pos: i]
 		t.pos = i
 	}
 	return t.token("comment1", ret, true)
@@ -307,15 +309,15 @@ func (t *Tokenizer) read_multiline_comment() *token {
 		i := t.find("*/")
 		text := t.text[t.pos:i]
 		t.pos = i + 2
-		t.line += text.split("\n").length - 1
+		//t.line += text.split("\n").length - 1
 		t.newline_before = t.newline_before || text.indexOf("\n") >= 0
 
 		// https://github.com/mishoo/UglifyJS/issues/#issue/100
-		if ( / ^@cc_on / i.test(text)) {
-			warn("WARNING: at line " + S.line)
-			warn("*** Found \"conditional comment\": " + text)
-			warn("*** UglifyJS DISCARDS ALL COMMENTS.  This means your code might no longer work properly in Internet Explorer.")
-		}
+		//if ( / ^@cc_on / i.test(text)) {
+		//	warn("WARNING: at line " + S.line)
+		//	warn("*** Found \"conditional comment\": " + text)
+		//	warn("*** UglifyJS DISCARDS ALL COMMENTS.  This means your code might no longer work properly in Internet Explorer.")
+		//}
 
 		return t.token("comment2", text, true)
 	})
@@ -357,7 +359,7 @@ func (t *Tokenizer) read_name() string {
 			backslash = false
 		}
 	}
-	if (HOP(KEYWORDS, name) && escaped) {
+	if HOP(KEYWORDS, name) && escaped {
 		hex = name.charCodeAt(0).toString(16).toUpperCase()
 		name = "\\u" + "0000".substr(hex.length) + hex + name.slice(1)
 	}
@@ -420,11 +422,11 @@ func (t *Tokenizer) handle_slash() *token {
 	var regex_allowed = t.regex_allowed
 	switch (t.peek()) {
 	case "/":
-		t.comments_before.push(t.read_line_comment())
+		t.comments_before = append(t.comments_before,t.read_line_comment())
 		t.regex_allowed = regex_allowed
 		return t.next_token(nil)
 	case "*":
-		t.comments_before.push(t.read_multiline_comment())
+		t.comments_before = append(t.comments_before,t.read_line_comment())
 		t.regex_allowed = regex_allowed
 		return t.next_token(nil)
 	}
