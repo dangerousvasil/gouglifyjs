@@ -1,7 +1,6 @@
 package parse_js
 
 import (
-	"fmt"
 	"log"
 	"regexp"
 	"strconv"
@@ -14,12 +13,12 @@ var EX_EOF = "END OF FILE"
 
 type Tokenizer struct {
 	text            string   // : TEXT.replace(/\r\n?|[\n\u2028\u2029]/g, "\n").replace(/^\uFEFF/, ''),
-	pos             int64    // : 0,
-	tokpos          int64    // : 0,
-	line            int64    // : 0,
-	tokline         int64    // : 0,
-	col             int64    // : 0,
-	tokcol          int64    // : 0,
+	pos             int      // : 0,
+	tokpos          int      // : 0,
+	line            int      // : 0,
+	tokline         int      // : 0,
+	col             int      // : 0,
+	tokcol          int      // : 0,
 	newline_before  bool     // : false,
 	regex_allowed   bool     // : false,
 	comments_before []*token //
@@ -27,13 +26,13 @@ type Tokenizer struct {
 
 func NewTokenizer(str string) *Tokenizer {
 	t := new(Tokenizer)
-	reg, err := regexp.Compile(`/\r\n?|[\n\u2028\u2029]/g`)
+	reg, err := regexp.Compile("/\r\n?|[\n\u2028\u2029]/g")
 	if err != nil {
 		panic(err)
 	}
 	str = reg.ReplaceAllString(str, "\n")
 
-	reg, err = regexp.Compile(`/^\uFEFF/`)
+	reg, err = regexp.Compile("/^\uFEFF/")
 	if err != nil {
 		panic(err)
 	}
@@ -45,12 +44,15 @@ func NewTokenizer(str string) *Tokenizer {
 }
 
 func (t *Tokenizer) peek() string {
+	if len(t.text) == t.pos {
+		return ""
+	}
 	return t.text[t.pos : t.pos+1]
 }
 
-func (t *Tokenizer) next(signal_eof bool, in_string bool) string {
-	t.pos++
+func (t *Tokenizer) Next(signal_eof bool, in_string bool) string {
 	var ch = t.text[t.pos : t.pos+1]
+	t.pos++
 	if signal_eof && ch == "" {
 		panic(EX_EOF)
 	}
@@ -83,20 +85,20 @@ func (t *Tokenizer) start_token() {
 }
 
 type token struct {
-	typ             string //: tp,
-	value           string //: value,
-	line            int64  //: t.tokline,
-	col             int64  //: t.tokcol,
-	pos             int64  //: t.tokpos,
-	endpos          int64  //: t.pos,
-	nlb             bool   // : t.newline_before
+	typ             string      //: tp,
+	value           interface{} //: value,
+	line            int         //: t.tokline,
+	col             int         //: t.tokcol,
+	pos             int         //: t.tokpos,
+	endpos          int         //: t.pos,
+	nlb             bool        // : t.newline_before
 	comments_before []*token
 }
 
-func (t *Tokenizer) token(tp string, value string, is_comment bool) *token {
-	t.regex_allowed = (tp == "operator" && !HOP(UNARY_POSTFIX, value)) ||
-		(tp == "keyword" && HOP(KEYWORDS_BEFORE_EXPRESSION, value)) ||
-		(tp == "punc" && HOP(PUNC_BEFORE_EXPRESSION, value))
+func (t *Tokenizer) token(tp string, value interface{}, is_comment bool) *token {
+	t.regex_allowed = (tp == "operator" && !HOP(UNARY_POSTFIX, value.(string))) ||
+		(tp == "keyword" && HOP(KEYWORDS_BEFORE_EXPRESSION, value.(string))) ||
+		(tp == "punc" && HOP(PUNC_BEFORE_EXPRESSION, value.(string)))
 	ret := token{
 		typ:    tp,
 		value:  value,
@@ -106,7 +108,7 @@ func (t *Tokenizer) token(tp string, value string, is_comment bool) *token {
 		endpos: t.pos,
 		nlb:    t.newline_before,
 	}
-	if (!is_comment) {
+	if !is_comment {
 		ret.comments_before = t.comments_before
 		t.comments_before = []*token{}
 		// make note of any newlines in the comments that came before
@@ -124,8 +126,7 @@ func (t *Tokenizer) token(tp string, value string, is_comment bool) *token {
 
 func (t *Tokenizer) skip_whitespace() {
 	for HOP(WHITESPACE_CHARS, t.peek()) {
-		str := t.next(false, false)
-		log.Println(str)
+		t.Next(false, false)
 	}
 }
 
@@ -135,7 +136,7 @@ func (t *Tokenizer) read_while(pred func(ch string, i int) bool) string {
 	i := 0
 	for ch != "" && pred(ch, i) {
 		i++
-		ret += t.next(false, false)
+		ret += t.Next(false, false)
 		ch = t.peek()
 	}
 	return ret
@@ -161,8 +162,8 @@ func (t *Tokenizer) read_num(prefix string) *token {
 
 			return has_x
 		}
-		if (!has_x && (ch == "E" || ch == "e")) {
-			if (has_e) {
+		if !has_x && (ch == "E" || ch == "e") {
+			if has_e {
 				return false
 			}
 			has_e = true
@@ -202,7 +203,7 @@ func (t *Tokenizer) read_num(prefix string) *token {
 }
 
 func (t *Tokenizer) read_escaped_char(in_string bool) string {
-	var ch = t.next(true, in_string)
+	var ch = t.Next(true, in_string)
 	switch ch {
 	case "n":
 		return "\n"
@@ -217,7 +218,7 @@ func (t *Tokenizer) read_escaped_char(in_string bool) string {
 	case "f":
 		return "\f"
 	case "0":
-		return "\0"
+		return `\0`
 	case "x":
 		return string(t.hex_bytes(2))
 	case "u":
@@ -233,7 +234,7 @@ func (t *Tokenizer) hex_bytes(n int) int64 {
 	var num int64 = 0
 	for ; n > 0; n-- {
 
-		digit, err := strconv.ParseInt(t.next(true, false), 2, 16)
+		digit, err := strconv.ParseInt(t.Next(true, false), 2, 16)
 
 		if err != nil {
 			log.Panic("Invalid hex-character pattern in string")
@@ -245,41 +246,48 @@ func (t *Tokenizer) hex_bytes(n int) int64 {
 
 func (t *Tokenizer) read_string() *token {
 	return t.with_eof_error("Unterminated string constant", func() *token {
-		quote := t.next(false, false)
+		quote := t.Next(false, false)
 		ret := ""
 		for true {
-			var ch = t.next(true, false)
-			if (ch == "\\") {
+			var ch = t.Next(true, false)
+			if ch == "\\" {
 				// read OctalEscapeSequence (XXX: deprecated if "strict mode")
 				// https://github.com/mishoo/UglifyJS/issues/178
 				octal_len := 0
 				first := ""
 				ch = t.read_while(func(ch string, i int) bool {
-					if (ch >= "0" && ch <= "7") {
-						if (first == "") {
+					if ch >= "0" && ch <= "7" {
+						if first == "" {
 							first = ch
 							octal_len++
 							return true
 						}
-						if (first <= "3" && octal_len <= 2) {
+						if first <= "3" && octal_len <= 2 {
 							octal_len++
 							return true
 						}
-						if (first >= "4" && octal_len <= 1) {
+						if first >= "4" && octal_len <= 1 {
 							octal_len++
 							return true
 						}
 					}
 					return false
 				})
-				if (octal_len > 0) {
-					ch = string(parseInt(ch, 8))
+				if octal_len > 0 {
+
+					chNum, err := strconv.ParseInt(ch, 2, 8)
+					if err != nil {
+						log.Println("parse_js_number", ch)
+					}
+
+					ch = strconv.FormatInt(chNum, 10)
+					//	ch = string(parseInt(ch, 8))
 				} else {
 					ch = t.read_escaped_char(true)
 				}
-			} else if (ch == quote) {
+			} else if ch == quote {
 				break
-			} else if (ch == "\n") {
+			} else if ch == "\n" {
 				log.Panic(EX_EOF)
 			}
 
@@ -290,27 +298,27 @@ func (t *Tokenizer) read_string() *token {
 }
 
 func (t *Tokenizer) read_line_comment() *token {
-	t.next(false, false)
+	t.Next(false, false)
 	i := t.find("\n")
 	ret := ""
-	if (i == -1) {
+	if i == -1 {
 		ret = t.text[t.pos:]
-		t.pos = int64(len(t.text))
+		t.pos = len(t.text)
 	} else {
-		ret = t.text[t.pos: i]
-		t.pos = i
+		ret = t.text[t.pos:i]
+		t.pos = int(i)
 	}
 	return t.token("comment1", ret, true)
 }
 
 func (t *Tokenizer) read_multiline_comment() *token {
-	t.next(false, false)
+	t.Next(false, false)
 	return t.with_eof_error("Unterminated multiline comment", func() *token {
 		i := t.find("*/")
 		text := t.text[t.pos:i]
-		t.pos = i + 2
+		t.pos = int(i) + 2
 		//t.line += text.split("\n").length - 1
-		t.newline_before = t.newline_before || text.indexOf("\n") >= 0
+		t.newline_before = t.newline_before || strings.IndexRune(text, '\n') >= 0
 
 		// https://github.com/mishoo/UglifyJS/issues/#issue/100
 		//if ( / ^@cc_on / i.test(text)) {
@@ -328,40 +336,45 @@ func (t *Tokenizer) read_name() string {
 	name := ""
 	ch := ""
 	escaped := false
-	hex := ""
 	for true {
 		ch = t.peek()
+
 		if ch == "" {
 			break
 		}
 
-		if (!backslash) {
-			if (ch == "\\") {
+		if !backslash {
+			if ch == "\\" {
 				escaped = true
 				backslash = true
-				t.next(false, false)
+				ch = t.Next(false, false)
 			} else {
-				if (IsIdentifierChar(ch)) {
-					name += t.next(false, false)
+				if IsIdentifierChar(ch) {
+					name += t.Next(false, false)
 				} else {
 					break
 				}
 			}
 		} else {
-			if (ch != "u") {
+			log.Println(ch)
+			if ch != "u" {
 				log.Panic("Expecting UnicodeEscapeSequence -- uXXXX")
 			}
 			ch = t.read_escaped_char(false)
-			if (!IsIdentifierChar(ch)) {
+			if !IsIdentifierChar(ch) {
 				log.Panic("Unicode char: ", ch, " is not valid in identifier")
 			}
 			name += ch
 			backslash = false
 		}
 	}
+
 	if HOP(KEYWORDS, name) && escaped {
-		hex = name.charCodeAt(0).toString(16).toUpperCase()
-		name = "\\u" + "0000".substr(hex.length) + hex + name.slice(1)
+		log.Println("HOP(KEYWORDS")
+		//hex = name.charCodeAt(0).toString(16).toUpperCase()
+		//name = "\\u" + "0000".substr(hex.length) + hex + name.slice(1)
+
+		log.Fatalln(name)
 	}
 	return name
 }
@@ -373,22 +386,22 @@ func (t *Tokenizer) read_regexp(regexp *string) *token {
 		in_class := false
 
 		for true {
-			ch = t.next(true, false)
+			ch = t.Next(true, false)
 			if ch == "" {
 				break
 			}
 			if prev_backslash {
 				*regexp += "\\" + ch
 				prev_backslash = false
-			} else if (ch == "[") {
+			} else if ch == "[" {
 				in_class = true
 				*regexp += ch
-			} else if (ch == "]" && in_class) {
+			} else if ch == "]" && in_class {
 				in_class = false
 				*regexp += ch
-			} else if (ch == "/" && !in_class) {
+			} else if ch == "/" && !in_class {
 				break
-			} else if (ch == "\\") {
+			} else if ch == "\\" {
 				prev_backslash = true
 			} else {
 				*regexp += ch
@@ -403,32 +416,32 @@ func (t *Tokenizer) read_operator(prefix string) *token {
 	if prefix != "" {
 		t.token("operator", t.grow(prefix), false)
 	}
-	return t.token("operator", t.grow(t.next(false, false)), false)
+	return t.token("operator", t.grow(t.Next(false, false)), false)
 }
 func (t *Tokenizer) grow(op string) string {
 	if t.peek() != "" {
 		return op
 	}
 	var bigger = op + t.peek()
-	if (HOP(OPERATORS, bigger)) {
-		t.next(false, false)
+	if HOP(OPERATORS, bigger) {
+		t.Next(false, false)
 		return t.grow(bigger)
 	} else {
 		return op
 	}
 }
 func (t *Tokenizer) handle_slash() *token {
-	t.next(false, false)
+	t.Next(false, false)
 	var regex_allowed = t.regex_allowed
-	switch (t.peek()) {
+	switch t.peek() {
 	case "/":
-		t.comments_before = append(t.comments_before,t.read_line_comment())
+		t.comments_before = append(t.comments_before, t.read_line_comment())
 		t.regex_allowed = regex_allowed
-		return t.next_token(nil)
+		return t.NextToken(nil)
 	case "*":
-		t.comments_before = append(t.comments_before,t.read_line_comment())
+		t.comments_before = append(t.comments_before, t.read_line_comment())
 		t.regex_allowed = regex_allowed
-		return t.next_token(nil)
+		return t.NextToken(nil)
 	}
 	if t.regex_allowed {
 		return t.read_regexp(nil)
@@ -437,64 +450,71 @@ func (t *Tokenizer) handle_slash() *token {
 }
 
 func (t *Tokenizer) handle_dot() *token {
-	t.next(false, false)
+	t.Next(false, false)
 	if IsDigit(t.peek()) {
-
 		return t.read_num(".")
 	}
 
 	return t.token("punc", ".", false)
-
 }
 
 func (t *Tokenizer) read_word() *token {
 	var word = t.read_name()
+
 	if !HOP(KEYWORDS, word) {
 		return t.token("name", word, false)
 	}
+
 	if HOP(OPERATORS, word) {
 		return t.token("operator", word, false)
 	}
+
 	if HOP(KEYWORDS_ATOM, word) {
 		return t.token("atom", word, false)
 	}
+
 	return t.token("keyword", word, false)
 }
 
 func (t *Tokenizer) with_eof_error(eof_error string, cont func() *token) *token {
-	return cont()
+	tkn := cont()
+	if tkn == nil {
+		log.Fatalln(eof_error, t)
+	}
+	return tkn
 }
 
-func (t *Tokenizer) next_token(force_regexp *string) *token {
-	if (force_regexp != nil) {
+func (t *Tokenizer) NextToken(force_regexp *string) *token {
+	if force_regexp != nil {
 		return t.read_regexp(force_regexp)
 	}
 	t.skip_whitespace()
 	t.start_token()
-	var ch = t.peek()
-	if (ch == "") {
+	ch := t.peek()
+
+	if ch == "" {
 		return t.token("eof", "", false)
 	}
-	if (IsDigit(ch)) {
+	if IsDigit(ch) {
 		return t.read_num("")
 	}
 	if ch == `"` || ch == "'" {
 		return t.read_string()
 	}
-	if (HOP(PUNC_CHARS, ch)) {
-		return t.token("punc", t.next(false,false),false)
+	if HOP(PUNC_CHARS, ch) {
+		return t.token("punc", t.Next(false, false), false)
 	}
-	if (ch == ".") {
+	if ch == "." {
 		return t.handle_dot()
 	}
-	if (ch == "/") {
+	if ch == "/" {
 		return t.handle_slash()
 	}
-	if (HOP(OPERATOR_CHARS, ch)) {
+	if HOP(OPERATOR_CHARS, ch) {
 		return t.read_operator("")
 	}
-	if (ch == "\\" || IsIdentifierStart(ch)){
-	return 	t.read_word()
+	if ch == "\\" || IsIdentifierStart(ch) {
+		return t.read_word()
 	}
 	log.Panic("Unexpected character '" + ch + "'")
 	return nil

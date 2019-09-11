@@ -156,12 +156,9 @@ var UNICODE = map[string]*regexp.Regexp{ // Unicode 6.1
 }
 
 func NewRegExp(exp string) *regexp.Regexp {
-	log.Println(exp)
 	rgxp, err := regexp.Compile(exp)
 	if err != nil {
-
 		log.Fatalln(err)
-
 	}
 
 	return rgxp
