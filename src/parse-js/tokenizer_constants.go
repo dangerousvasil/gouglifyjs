@@ -8,7 +8,7 @@ import (
 
 /* -----[ Tokenizer (constants) ]----- */
 
-var KEYWORDS = array_to_hash([]string{
+var KEYWORDS = ArrayToHash([]string{
 	"break",
 	"case",
 	"catch",
@@ -36,7 +36,7 @@ var KEYWORDS = array_to_hash([]string{
 	"while",
 	"with"})
 
-var RESERVED_WORDS = array_to_hash([]string{
+var RESERVED_WORDS = ArrayToHash([]string{
 	"abstract",
 	"boolean",
 	"byte",
@@ -67,7 +67,7 @@ var RESERVED_WORDS = array_to_hash([]string{
 	"transient",
 	"volatile"})
 
-var KEYWORDS_BEFORE_EXPRESSION = array_to_hash([]string{
+var KEYWORDS_BEFORE_EXPRESSION = ArrayToHash([]string{
 	"return",
 	"new",
 	"delete",
@@ -76,14 +76,14 @@ var KEYWORDS_BEFORE_EXPRESSION = array_to_hash([]string{
 	"case",
 })
 
-var KEYWORDS_ATOM = array_to_hash([]string{
+var KEYWORDS_ATOM = ArrayToHash([]string{
 	"false",
 	"null",
 	"true",
 	"undefined",
 })
 
-var OPERATOR_CHARS = array_to_hash(characters("+-*&%=<>!?|~^"))
+var OPERATOR_CHARS = ArrayToHash(characters("+-*&%=<>!?|~^"))
 
 var RE_HEX_NUMBER = NewRegExp(`/^0x[0-9a-f]+$/i`)
 
@@ -91,7 +91,7 @@ var RE_OCT_NUMBER = NewRegExp(`/^0[0-7]+$/`)
 
 var RE_DEC_NUMBER = NewRegExp(`/^\d*\.?\d*(?:e[+-]?\d*(?:\d\.?|\.?\d)\d*)?$/i`)
 
-var OPERATORS = array_to_hash([]string{
+var OPERATORS = ArrayToHash([]string{
 	"in",
 	"instanceof",
 	"typeof",
@@ -138,13 +138,13 @@ var OPERATORS = array_to_hash([]string{
 	"||",
 })
 
-var WHITESPACE_CHARS = array_to_hash(characters(" \u00a0\n\r\t\f\u000b\u200b\u180e\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u202f\u205f\u3000\uFEFF"))
+var WHITESPACE_CHARS = ArrayToHash(characters(" \u00a0\n\r\t\f\u000b\u200b\u180e\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u202f\u205f\u3000\uFEFF"))
 
-var PUNC_BEFORE_EXPRESSION = array_to_hash(characters("[{(,.;:"))
+var PUNC_BEFORE_EXPRESSION = ArrayToHash(characters("[{(,.;:"))
 
-var PUNC_CHARS = array_to_hash(characters("[]{}(),;:"))
+var PUNC_CHARS = ArrayToHash(characters("[]{}(),;:"))
 
-var REGEXP_MODIFIERS = array_to_hash(characters("gmsiy"))
+var REGEXP_MODIFIERS = ArrayToHash(characters("gmsiy"))
 
 /* -----[ Tokenizer ]----- */
 
@@ -202,36 +202,27 @@ func IsIdentifierChar(ch string) bool {
 }
 
 func ParseJsNumber(num string) *float64 {
-	if RE_HEX_NUMBER.Match([]byte(num)) {
-		// parseInt(num.substr(2), 16);
-		intJs, err := strconv.ParseInt(num, 2, 16)
-		if err != nil {
-			log.Println("parse_js_number", num)
-			panic(err)
-			return nil
-		}
-		rtrn := float64(intJs)
-		return &rtrn
-	} else if RE_OCT_NUMBER.Match([]byte(num)) {
-		//return parseInt(num.substr(1), 8);
-		intJs, err := strconv.ParseInt(num, 2, 8)
-		if err != nil {
-			log.Println("parse_js_number", num)
-			panic(err)
-			return nil
-		}
-		rtrn := float64(intJs)
-		return &rtrn
-	} else if RE_DEC_NUMBER.Match([]byte(num)) {
-		//return parseFloat(num);
-		intJs, err := strconv.ParseFloat(num, 10)
-		if err != nil {
-			log.Println("parse_js_number", num)
-			panic(err)
-			return nil
-		}
+	intJs, err := strconv.ParseInt(num, 16, 64)
+	if err == nil {
 		rtrn := float64(intJs)
 		return &rtrn
 	}
+
+	intJs, err = strconv.ParseInt(num, 8, 64)
+	if err == nil {
+		rtrn := float64(intJs)
+		return &rtrn
+	}
+
+	intJs, err = strconv.ParseInt(num, 0, 64)
+	if err == nil {
+		rtrn := float64(intJs)
+		return &rtrn
+	}
+	fJs, err := strconv.ParseFloat(num, 64)
+	if err == nil {
+		return &fJs
+	}
+
 	return nil
 }

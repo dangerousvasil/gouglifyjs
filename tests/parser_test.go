@@ -10,7 +10,7 @@ var DIGITS_OVERRIDE_FOR_TESTING = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRS
 
 func TestParsersuite(t *testing.T) {
 	//parseJS.parse(input);
-
+	log.SetFlags(log.Llongfile)
 	var inps = [][]string{
 		{"var abc;", "Regular variable statement w/o assignment"},
 		{"var abc = 5;", "Regular variable statement with assignment"},
@@ -22,9 +22,9 @@ func TestParsersuite(t *testing.T) {
 		{"a + b;", `addition`},
 		{"'a';", `single string literal`},
 		{"'a\\n';", `single string literal with escaped return`},
-		{`a";`, `double string literal`},
-		{`a\\n";`, `double string literal with escaped return`},
-		{`var";`, `string is a keyword`},
+		{`"a";`, `double string literal`},
+		{"'a\n';", `double string literal with escaped return`},
+		{`"var";`, `string is a keyword`},
 		{`"variable";`, `string starts with a keyword`},
 		{`"somevariable";`, `string contains a keyword`},
 		{`"somevar";`, `string ends with a keyword`},
@@ -71,7 +71,7 @@ func TestParsersuite(t *testing.T) {
 		{"x+5;", `9 identifier`},
 		{"xyz123;", `10 identifier`},
 		{"x1y1z1;", `11 identifier`},
-		{"foo\\u00D8bar;", `12 identifier unicode escape`},
+		{"foo\u00D8bar;", `12 identifier unicode escape`},
 		//["foo�bar;",'13 identifier unicode embedded (might fail)`},
 		// numbers
 		{"5;", `1 number`},
@@ -100,20 +100,20 @@ func TestParsersuite(t *testing.T) {
 		{"0x0001;", `26 number`},
 		// strings
 		{"\"foo\";", `1 string`},
-		{`\'foo\';`, `2 string`},
+		{"'foo';", `2 string`},
 		{"\"x\";", `3 string`},
-		{`\'\';`, `4 string`},
+		{"'';", `4 string`},
 		{"\"foo\\tbar\";", `5 string`},
 		{"\"!@#$%^&*()_+{}[]\";", `6 string`},
 		{"\"/*test*/\";", `7 string`},
 		{"\"//test\";", `8 string`},
 		{"\"\\\\\";", `9 string`},
 		{"\"\\u0001\";", `10 string`},
-		{"\"\\uFEFF\";", `11 string`},
-		{"\"\\u10002\";", `12 string`},
-		{"\"\\x55\";", `13 string`},
-		{"\"\\x55a\";", `14 string`},
-		{"\"a\\\\nb\";", `15 string`},
+		{"\"\uFEFF\";", `11 string`},
+		{"\"\u10002\";", `12 string`},
+		{"\"\x55\";", `13 string`},
+		{"\"\x55a\";", `14 string`},
+		{"\"a\\\nb\";", `15 string`},
 		{`";"`, `16 string: semi in a string`},
 		{`"a\\\nb";`, `17 string: line terminator escape`},
 		// literals
@@ -354,7 +354,10 @@ func TestParsersuite(t *testing.T) {
 		{"//test\n", `3 Empty program`},
 		{"\n// test", `4 Empty program`},
 		{"\n// test\n", `5 Empty program`},
-		{"/* */", `6 Empty program`},
+		{`/* " +
+			"" +
+			"" +
+			"dsfadsf*/`, `6 Empty program`},
 		{"/*\ns,fd\n*/", `7 Empty program`},
 		{"/*\ns,fd\n*/\n", `8 Empty program`},
 		{"  	", `9 Empty program`},
@@ -391,9 +394,19 @@ func TestParsersuite(t *testing.T) {
 	}
 
 	for _, v := range inps {
-		t := parse_js.NewTokenizer(v[0])
+		log.Println(v[1])
+		job(v[0])
+	}
+}
+
+func job(str string) {
+	log.Println("-=-=-=-=-=-=-=-")
+	t := parse_js.NewTokenizer(str)
+	for true {
 		txt := t.NextToken(nil)
-		log.Println(t)
+		if txt == nil {
+			return
+		}
 		log.Println(txt)
 	}
 }

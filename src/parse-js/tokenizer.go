@@ -69,11 +69,11 @@ func (t *Tokenizer) Eof() bool {
 }
 
 func (t *Tokenizer) Find(what string) int {
-	pos := strings.IndexRune(t.Text[t.Pos:], []rune(what)[0])
+	pos := strings.Index(t.Text[t.Pos:], what)
 	return pos
 }
 
-func (t *Tokenizer) startToken() {
+func (t *Tokenizer) StartToken() {
 	t.Tokline = t.Line
 	t.Tokcol = t.Col
 	t.Tokpos = t.Pos
@@ -91,9 +91,11 @@ type Token struct {
 }
 
 func (t *Tokenizer) Token(tp string, value interface{}, is_comment bool) *Token {
+
 	t.RegexAllowed = (tp == "operator" && !HOP(UNARY_POSTFIX, value.(string))) ||
 		(tp == "keyword" && HOP(KEYWORDS_BEFORE_EXPRESSION, value.(string))) ||
 		(tp == "punc" && HOP(PUNC_BEFORE_EXPRESSION, value.(string)))
+
 	ret := Token{
 		Typ:    tp,
 		Value:  value,
@@ -135,7 +137,6 @@ func (t *Tokenizer) ReadWhile(pred func(ch string, i int) bool) string {
 		ch = t.Peek()
 	}
 	return ret
-
 }
 
 func (t *Tokenizer) ReadNum(prefix string) *Token {
@@ -185,6 +186,7 @@ func (t *Tokenizer) ReadNum(prefix string) *Token {
 		num = prefix + num
 	}
 	var valid = ParseJsNumber(num)
+
 	if valid != nil {
 		return t.Token("num", valid, false)
 	} else {
@@ -278,10 +280,9 @@ func (t *Tokenizer) ReadString() *Token {
 				}
 			} else if ch == quote {
 				break
-			} else if ch == "\n" {
+			} else if ch == "" {
 				log.Panic(EX_EOF)
 			}
-
 			ret += ch
 		}
 		return t.Token("string", ret, false)
@@ -292,13 +293,14 @@ func (t *Tokenizer) ReadLineComment() *Token {
 	t.Next(false, false)
 	i := t.Find("\n")
 	ret := ""
-	if i == -1 {
+	if i < 1 {
 		ret = t.Text[t.Pos:]
 		t.Pos = len(t.Text)
 	} else {
-		ret = t.Text[t.Pos:i]
-		t.Pos = int(i)
+		ret = t.Text[t.Pos : t.Pos+i]
+		t.Pos = int(t.Pos + i)
 	}
+
 	return t.Token("comment1", ret, true)
 }
 
@@ -307,17 +309,9 @@ func (t *Tokenizer) ReadMultilineComment() *Token {
 	return t.WithEofError("Unterminated multiline comment", func() *Token {
 		i := t.Find("*/")
 		text := t.Text[t.Pos:i]
-		t.Pos = 2 + i
+		t.Pos = t.Pos + 2 + i
 		t.Line += len(strings.Split(text, "\n")) - 1
 		t.NewlineBefore = t.NewlineBefore || strings.IndexRune(text, '\n') >= 0
-
-		// https://github.com/mishoo/UglifyJS/issues/#issue/100
-		//if ( / ^@cc_on / i.test(text)) {
-		//	warn("WARNING: at line " + S.line)
-		//	warn("*** Found \"conditional comment\": " + text)
-		//	warn("*** UglifyJS DISCARDS ALL COMMENTS.  This means your code might no longer work properly in Internet Explorer.")
-		//}
-
 		return t.Token("comment2", text, true)
 	})
 }
@@ -333,7 +327,6 @@ func (t *Tokenizer) ReadName() string {
 		if ch == "" {
 			break
 		}
-
 		if !backslash {
 			if ch == "\\" {
 				escaped = true
@@ -347,9 +340,8 @@ func (t *Tokenizer) ReadName() string {
 				}
 			}
 		} else {
-			log.Println(ch)
 			if ch != "u" {
-				log.Panic("Expecting UnicodeEscapeSequence -- uXXXX")
+				log.Panicln("Expecting UnicodeEscapeSequence -- uXXXX", ch, name)
 			}
 			ch = t.ReadEscapedChar(false)
 			if !IsIdentifierChar(ch) {
@@ -378,8 +370,9 @@ func (t *Tokenizer) ReadRegexp(regexp *string) *Token {
 
 		for true {
 			ch = t.Next(true, false)
-			if ch == "" {
-				break
+			if regexp == nil {
+				str := ""
+				regexp = &str
 			}
 			if prev_backslash {
 				*regexp += "\\" + ch
@@ -410,10 +403,11 @@ func (t *Tokenizer) ReadOperator(prefix string) *Token {
 	return t.Token("operator", t.Grow(t.Next(false, false)), false)
 }
 func (t *Tokenizer) Grow(op string) string {
-	if t.Peek() != "" {
+	if t.Peek() == "" {
 		return op
 	}
 	var bigger = op + t.Peek()
+
 	if HOP(OPERATORS, bigger) {
 		t.Next(false, false)
 		return t.Grow(bigger)
@@ -421,6 +415,7 @@ func (t *Tokenizer) Grow(op string) string {
 		return op
 	}
 }
+
 func (t *Tokenizer) HandleSlash() *Token {
 	t.Next(false, false)
 	var regexAllowed = t.RegexAllowed
@@ -435,7 +430,8 @@ func (t *Tokenizer) HandleSlash() *Token {
 		return t.NextToken(nil)
 	}
 	if t.RegexAllowed {
-		return t.ReadRegexp(nil)
+		regexp := ""
+		return t.ReadRegexp(&regexp)
 	}
 	return t.ReadOperator("/")
 }
@@ -480,11 +476,11 @@ func (t *Tokenizer) NextToken(force_regexp *string) *Token {
 		return t.ReadRegexp(force_regexp)
 	}
 	t.SkipWhitespace()
-	t.startToken()
+	t.StartToken()
 	ch := t.Peek()
 
 	if ch == "" {
-		return t.Token("eof", "", false)
+		return nil //t.Token("eof", "", false)
 	}
 	if IsDigit(ch) {
 		return t.ReadNum("")

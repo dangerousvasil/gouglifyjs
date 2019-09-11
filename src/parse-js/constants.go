@@ -2,7 +2,7 @@ package parse_js
 
 /* -----[ Parser (constants) ]----- */
 
-var UNARY_PREFIX = array_to_hash([]string{
+var UNARY_PREFIX = ArrayToHash([]string{
 	"typeof",
 	"void",
 	"delete",
@@ -14,7 +14,7 @@ var UNARY_PREFIX = array_to_hash([]string{
 	"+",
 })
 
-var UNARY_POSTFIX = array_to_hash([]string{"--", "++"})
+var UNARY_POSTFIX = ArrayToHash([]string{"--", "++"})
 
 var ASSIGNMENT = (func(a []string, ret map[string]string, i int) map[string]string {
 	for i < len(a) {
@@ -50,6 +50,6 @@ var PRECEDENCE = (func(a [][]string, ret map[string]int) map[string]int {
 	map[string]int{},
 )
 
-var STATEMENTS_WITH_LABELS = array_to_hash([]string{"for", "do", "while", "switch"})
+var STATEMENTS_WITH_LABELS = ArrayToHash([]string{"for", "do", "while", "switch"})
 
-var ATOMIC_START_TOKEN = array_to_hash([]string{"atom", "num", "string", "regexp", "name"})
+var ATOMIC_START_TOKEN = ArrayToHash([]string{"atom", "num", "string", "regexp", "name"})

@@ -2,7 +2,7 @@ package parse_js
 
 import "strings"
 
-func array_to_hash(a []string) map[string]bool {
+func ArrayToHash(a []string) map[string]bool {
 	ret := map[string]bool{}
 	for _, v := range a {
 		ret[v] = true
