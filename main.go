@@ -33,8 +33,13 @@ func main() {
 		log.Fatalln(err)
 	}
 	t := parse_js.NewTokenizer(string(jsByt))
-	txt := t.NextToken(nil)
-	log.Println(t)
-	log.Println(txt)
+	for true {
+		txt := t.NextToken(nil)
+		if txt == nil {
+			break
+		}
+		log.Println("-=-=-=-=-=-=-=-")
+		log.Println(txt)
 
+	}
 }

@@ -9,19 +9,17 @@ import (
 
 var EX_EOF = "END OF FILE"
 
-//func  tokenizer(TEXT string)  {
-
 type Tokenizer struct {
-	text            string   // : TEXT.replace(/\r\n?|[\n\u2028\u2029]/g, "\n").replace(/^\uFEFF/, ''),
-	pos             int      // : 0,
-	tokpos          int      // : 0,
-	line            int      // : 0,
-	tokline         int      // : 0,
-	col             int      // : 0,
-	tokcol          int      // : 0,
-	newline_before  bool     // : false,
-	regex_allowed   bool     // : false,
-	comments_before []*token //
+	Text           string
+	Pos            int
+	Tokpos         int
+	Line           int
+	Tokline        int
+	Col            int
+	Tokcol         int
+	NewlineBefore  bool
+	RegexAllowed   bool
+	commentsBefore []*Token
 }
 
 func NewTokenizer(str string) *Tokenizer {
@@ -39,78 +37,75 @@ func NewTokenizer(str string) *Tokenizer {
 
 	str = reg.ReplaceAllString(str, "")
 
-	t.text = str
+	t.Text = str
 	return t
 }
 
-func (t *Tokenizer) peek() string {
-	if len(t.text) == t.pos {
+func (t *Tokenizer) Peek() string {
+	if len(t.Text) == t.Pos {
 		return ""
 	}
-	return t.text[t.pos : t.pos+1]
+	return t.Text[t.Pos : t.Pos+1]
 }
 
 func (t *Tokenizer) Next(signal_eof bool, in_string bool) string {
-	var ch = t.text[t.pos : t.pos+1]
-	t.pos++
+	var ch = t.Peek()
+	t.Pos++
 	if signal_eof && ch == "" {
 		panic(EX_EOF)
 	}
 	if ch == "\n" {
-		t.newline_before = t.newline_before || in_string
-		t.line++
-		t.col = 0
+		t.NewlineBefore = t.NewlineBefore || in_string
+		t.Line++
+		t.Col = 0
 	} else {
-		t.col++
+		t.Col++
 	}
 	return ch
 }
 
-func (t *Tokenizer) eof() bool {
-	return t.peek() == ""
-
+func (t *Tokenizer) Eof() bool {
+	return t.Peek() == ""
 }
 
-func (t *Tokenizer) find(what string) int64 {
-	pos := strings.IndexRune(t.text[t.pos:], []rune(what)[0])
-	//	var pos = t.text.indexOf(what, t.pos)
-
-	return int64(pos)
+func (t *Tokenizer) Find(what string) int {
+	pos := strings.IndexRune(t.Text[t.Pos:], []rune(what)[0])
+	return pos
 }
 
-func (t *Tokenizer) start_token() {
-	t.tokline = t.line
-	t.tokcol = t.col
-	t.tokpos = t.pos
+func (t *Tokenizer) startToken() {
+	t.Tokline = t.Line
+	t.Tokcol = t.Col
+	t.Tokpos = t.Pos
 }
 
-type token struct {
-	typ             string      //: tp,
-	value           interface{} //: value,
-	line            int         //: t.tokline,
-	col             int         //: t.tokcol,
-	pos             int         //: t.tokpos,
-	endpos          int         //: t.pos,
-	nlb             bool        // : t.newline_before
-	comments_before []*token
+type Token struct {
+	Typ            string
+	Value          interface{}
+	Line           int
+	Col            int
+	Pos            int
+	Endpos         int
+	Nlb            bool
+	CommentsBefore []*Token
 }
 
-func (t *Tokenizer) token(tp string, value interface{}, is_comment bool) *token {
-	t.regex_allowed = (tp == "operator" && !HOP(UNARY_POSTFIX, value.(string))) ||
+func (t *Tokenizer) Token(tp string, value interface{}, is_comment bool) *Token {
+	t.RegexAllowed = (tp == "operator" && !HOP(UNARY_POSTFIX, value.(string))) ||
 		(tp == "keyword" && HOP(KEYWORDS_BEFORE_EXPRESSION, value.(string))) ||
 		(tp == "punc" && HOP(PUNC_BEFORE_EXPRESSION, value.(string)))
-	ret := token{
-		typ:    tp,
-		value:  value,
-		line:   t.tokline,
-		col:    t.tokcol,
-		pos:    t.tokpos,
-		endpos: t.pos,
-		nlb:    t.newline_before,
+	ret := Token{
+		Typ:    tp,
+		Value:  value,
+		Line:   t.Tokline,
+		Col:    t.Tokcol,
+		Pos:    t.Tokpos,
+		Endpos: t.Pos,
+		Nlb:    t.NewlineBefore,
 	}
 	if !is_comment {
-		ret.comments_before = t.comments_before
-		t.comments_before = []*token{}
+		ret.CommentsBefore = t.commentsBefore
+		t.commentsBefore = []*Token{}
 		// make note of any newlines in the comments that came before
 		//for (var i = 0, len = ret.comments_before.length i < len i++) {
 		//ret.nlb = ret.nlb || ret.comments_before[i].nlb
@@ -119,41 +114,37 @@ func (t *Tokenizer) token(tp string, value interface{}, is_comment bool) *token 
 		//for _,v := range ret.comments_before {
 		//	ret.nlb = ret.nlb // || v.nlb
 		//}
-		t.newline_before = false
+		t.NewlineBefore = false
 	}
 	return &ret
 }
 
-func (t *Tokenizer) skip_whitespace() {
-	for HOP(WHITESPACE_CHARS, t.peek()) {
+func (t *Tokenizer) SkipWhitespace() {
+	for HOP(WHITESPACE_CHARS, t.Peek()) {
 		t.Next(false, false)
 	}
 }
 
-func (t *Tokenizer) read_while(pred func(ch string, i int) bool) string {
+func (t *Tokenizer) ReadWhile(pred func(ch string, i int) bool) string {
 	ret := ""
-	ch := t.peek()
+	ch := t.Peek()
 	i := 0
 	for ch != "" && pred(ch, i) {
 		i++
 		ret += t.Next(false, false)
-		ch = t.peek()
+		ch = t.Peek()
 	}
 	return ret
 
 }
 
-func (t *Tokenizer) parse_error(err string) {
-	log.Panic(err, t)
-}
-
-func (t *Tokenizer) read_num(prefix string) *token {
+func (t *Tokenizer) ReadNum(prefix string) *Token {
 	has_e := false
 	after_e := false
 	has_x := false
 	has_dot := prefix == "."
 
-	var num = t.read_while(func(ch string, i int) bool {
+	var num = t.ReadWhile(func(ch string, i int) bool {
 		if ch == "x" || ch == "X" {
 			if has_x {
 				return false
@@ -195,14 +186,14 @@ func (t *Tokenizer) read_num(prefix string) *token {
 	}
 	var valid = ParseJsNumber(num)
 	if valid != nil {
-		return t.token("num", valid, false)
+		return t.Token("num", valid, false)
 	} else {
 		panic("Invalid syntax: " + num)
 	}
 	return nil
 }
 
-func (t *Tokenizer) read_escaped_char(in_string bool) string {
+func (t *Tokenizer) ReadEscapedChar(in_string bool) string {
 	var ch = t.Next(true, in_string)
 	switch ch {
 	case "n":
@@ -220,9 +211,9 @@ func (t *Tokenizer) read_escaped_char(in_string bool) string {
 	case "0":
 		return `\0`
 	case "x":
-		return string(t.hex_bytes(2))
+		return string(t.hexBytes(2))
 	case "u":
-		return string(t.hex_bytes(4))
+		return string(t.hexBytes(4))
 	case "\n":
 		return ""
 	default:
@@ -230,7 +221,7 @@ func (t *Tokenizer) read_escaped_char(in_string bool) string {
 	}
 }
 
-func (t *Tokenizer) hex_bytes(n int) int64 {
+func (t *Tokenizer) hexBytes(n int) int64 {
 	var num int64 = 0
 	for ; n > 0; n-- {
 
@@ -244,8 +235,8 @@ func (t *Tokenizer) hex_bytes(n int) int64 {
 	return num
 }
 
-func (t *Tokenizer) read_string() *token {
-	return t.with_eof_error("Unterminated string constant", func() *token {
+func (t *Tokenizer) ReadString() *Token {
+	return t.WithEofError("Unterminated string constant", func() *Token {
 		quote := t.Next(false, false)
 		ret := ""
 		for true {
@@ -255,7 +246,7 @@ func (t *Tokenizer) read_string() *token {
 				// https://github.com/mishoo/UglifyJS/issues/178
 				octal_len := 0
 				first := ""
-				ch = t.read_while(func(ch string, i int) bool {
+				ch = t.ReadWhile(func(ch string, i int) bool {
 					if ch >= "0" && ch <= "7" {
 						if first == "" {
 							first = ch
@@ -283,7 +274,7 @@ func (t *Tokenizer) read_string() *token {
 					ch = strconv.FormatInt(chNum, 10)
 					//	ch = string(parseInt(ch, 8))
 				} else {
-					ch = t.read_escaped_char(true)
+					ch = t.ReadEscapedChar(true)
 				}
 			} else if ch == quote {
 				break
@@ -293,32 +284,32 @@ func (t *Tokenizer) read_string() *token {
 
 			ret += ch
 		}
-		return t.token("string", ret, false)
+		return t.Token("string", ret, false)
 	})
 }
 
-func (t *Tokenizer) read_line_comment() *token {
+func (t *Tokenizer) ReadLineComment() *Token {
 	t.Next(false, false)
-	i := t.find("\n")
+	i := t.Find("\n")
 	ret := ""
 	if i == -1 {
-		ret = t.text[t.pos:]
-		t.pos = len(t.text)
+		ret = t.Text[t.Pos:]
+		t.Pos = len(t.Text)
 	} else {
-		ret = t.text[t.pos:i]
-		t.pos = int(i)
+		ret = t.Text[t.Pos:i]
+		t.Pos = int(i)
 	}
-	return t.token("comment1", ret, true)
+	return t.Token("comment1", ret, true)
 }
 
-func (t *Tokenizer) read_multiline_comment() *token {
+func (t *Tokenizer) ReadMultilineComment() *Token {
 	t.Next(false, false)
-	return t.with_eof_error("Unterminated multiline comment", func() *token {
-		i := t.find("*/")
-		text := t.text[t.pos:i]
-		t.pos = int(i) + 2
-		//t.line += text.split("\n").length - 1
-		t.newline_before = t.newline_before || strings.IndexRune(text, '\n') >= 0
+	return t.WithEofError("Unterminated multiline comment", func() *Token {
+		i := t.Find("*/")
+		text := t.Text[t.Pos:i]
+		t.Pos = 2 + i
+		t.Line += len(strings.Split(text, "\n")) - 1
+		t.NewlineBefore = t.NewlineBefore || strings.IndexRune(text, '\n') >= 0
 
 		// https://github.com/mishoo/UglifyJS/issues/#issue/100
 		//if ( / ^@cc_on / i.test(text)) {
@@ -327,17 +318,17 @@ func (t *Tokenizer) read_multiline_comment() *token {
 		//	warn("*** UglifyJS DISCARDS ALL COMMENTS.  This means your code might no longer work properly in Internet Explorer.")
 		//}
 
-		return t.token("comment2", text, true)
+		return t.Token("comment2", text, true)
 	})
 }
 
-func (t *Tokenizer) read_name() string {
+func (t *Tokenizer) ReadName() string {
 	backslash := false
 	name := ""
 	ch := ""
 	escaped := false
 	for true {
-		ch = t.peek()
+		ch = t.Peek()
 
 		if ch == "" {
 			break
@@ -360,7 +351,7 @@ func (t *Tokenizer) read_name() string {
 			if ch != "u" {
 				log.Panic("Expecting UnicodeEscapeSequence -- uXXXX")
 			}
-			ch = t.read_escaped_char(false)
+			ch = t.ReadEscapedChar(false)
 			if !IsIdentifierChar(ch) {
 				log.Panic("Unicode char: ", ch, " is not valid in identifier")
 			}
@@ -379,8 +370,8 @@ func (t *Tokenizer) read_name() string {
 	return name
 }
 
-func (t *Tokenizer) read_regexp(regexp *string) *token {
-	return t.with_eof_error("Unterminated regular expression", func() *token {
+func (t *Tokenizer) ReadRegexp(regexp *string) *Token {
+	return t.WithEofError("Unterminated regular expression", func() *Token {
 		prev_backslash := false
 		ch := ""
 		in_class := false
@@ -407,76 +398,76 @@ func (t *Tokenizer) read_regexp(regexp *string) *token {
 				*regexp += ch
 			}
 		}
-		var mods = t.read_name()
-		return t.token("regexp", []string{*regexp, mods}, false)
+		var mods = t.ReadName()
+		return t.Token("regexp", []string{*regexp, mods}, false)
 	})
 }
 
-func (t *Tokenizer) read_operator(prefix string) *token {
+func (t *Tokenizer) ReadOperator(prefix string) *Token {
 	if prefix != "" {
-		t.token("operator", t.grow(prefix), false)
+		t.Token("operator", t.Grow(prefix), false)
 	}
-	return t.token("operator", t.grow(t.Next(false, false)), false)
+	return t.Token("operator", t.Grow(t.Next(false, false)), false)
 }
-func (t *Tokenizer) grow(op string) string {
-	if t.peek() != "" {
+func (t *Tokenizer) Grow(op string) string {
+	if t.Peek() != "" {
 		return op
 	}
-	var bigger = op + t.peek()
+	var bigger = op + t.Peek()
 	if HOP(OPERATORS, bigger) {
 		t.Next(false, false)
-		return t.grow(bigger)
+		return t.Grow(bigger)
 	} else {
 		return op
 	}
 }
-func (t *Tokenizer) handle_slash() *token {
+func (t *Tokenizer) HandleSlash() *Token {
 	t.Next(false, false)
-	var regex_allowed = t.regex_allowed
-	switch t.peek() {
+	var regexAllowed = t.RegexAllowed
+	switch t.Peek() {
 	case "/":
-		t.comments_before = append(t.comments_before, t.read_line_comment())
-		t.regex_allowed = regex_allowed
+		t.commentsBefore = append(t.commentsBefore, t.ReadLineComment())
+		t.RegexAllowed = regexAllowed
 		return t.NextToken(nil)
 	case "*":
-		t.comments_before = append(t.comments_before, t.read_line_comment())
-		t.regex_allowed = regex_allowed
+		t.commentsBefore = append(t.commentsBefore, t.ReadLineComment())
+		t.RegexAllowed = regexAllowed
 		return t.NextToken(nil)
 	}
-	if t.regex_allowed {
-		return t.read_regexp(nil)
+	if t.RegexAllowed {
+		return t.ReadRegexp(nil)
 	}
-	return t.read_operator("/")
+	return t.ReadOperator("/")
 }
 
-func (t *Tokenizer) handle_dot() *token {
+func (t *Tokenizer) HandleDot() *Token {
 	t.Next(false, false)
-	if IsDigit(t.peek()) {
-		return t.read_num(".")
+	if IsDigit(t.Peek()) {
+		return t.ReadNum(".")
 	}
 
-	return t.token("punc", ".", false)
+	return t.Token("punc", ".", false)
 }
 
-func (t *Tokenizer) read_word() *token {
-	var word = t.read_name()
+func (t *Tokenizer) ReadWord() *Token {
+	var word = t.ReadName()
 
 	if !HOP(KEYWORDS, word) {
-		return t.token("name", word, false)
+		return t.Token("name", word, false)
 	}
 
 	if HOP(OPERATORS, word) {
-		return t.token("operator", word, false)
+		return t.Token("operator", word, false)
 	}
 
 	if HOP(KEYWORDS_ATOM, word) {
-		return t.token("atom", word, false)
+		return t.Token("atom", word, false)
 	}
 
-	return t.token("keyword", word, false)
+	return t.Token("keyword", word, false)
 }
 
-func (t *Tokenizer) with_eof_error(eof_error string, cont func() *token) *token {
+func (t *Tokenizer) WithEofError(eof_error string, cont func() *Token) *Token {
 	tkn := cont()
 	if tkn == nil {
 		log.Fatalln(eof_error, t)
@@ -484,37 +475,37 @@ func (t *Tokenizer) with_eof_error(eof_error string, cont func() *token) *token 
 	return tkn
 }
 
-func (t *Tokenizer) NextToken(force_regexp *string) *token {
+func (t *Tokenizer) NextToken(force_regexp *string) *Token {
 	if force_regexp != nil {
-		return t.read_regexp(force_regexp)
+		return t.ReadRegexp(force_regexp)
 	}
-	t.skip_whitespace()
-	t.start_token()
-	ch := t.peek()
+	t.SkipWhitespace()
+	t.startToken()
+	ch := t.Peek()
 
 	if ch == "" {
-		return t.token("eof", "", false)
+		return t.Token("eof", "", false)
 	}
 	if IsDigit(ch) {
-		return t.read_num("")
+		return t.ReadNum("")
 	}
 	if ch == `"` || ch == "'" {
-		return t.read_string()
+		return t.ReadString()
 	}
 	if HOP(PUNC_CHARS, ch) {
-		return t.token("punc", t.Next(false, false), false)
+		return t.Token("punc", t.Next(false, false), false)
 	}
 	if ch == "." {
-		return t.handle_dot()
+		return t.HandleDot()
 	}
 	if ch == "/" {
-		return t.handle_slash()
+		return t.HandleSlash()
 	}
 	if HOP(OPERATOR_CHARS, ch) {
-		return t.read_operator("")
+		return t.ReadOperator("")
 	}
 	if ch == "\\" || IsIdentifierStart(ch) {
-		return t.read_word()
+		return t.ReadWord()
 	}
 	log.Panic("Unexpected character '" + ch + "'")
 	return nil

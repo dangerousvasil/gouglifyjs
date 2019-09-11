@@ -235,12 +235,3 @@ func ParseJsNumber(num string) *float64 {
 	}
 	return nil
 }
-
-//func JS_Parse_Error(message, line, col, pos) {
-//	this.message = message
-//	this.line = line + 1
-//	this.col = col + 1
-//	this.pos = pos + 1
-//	this.stack = new
-//	Error().stack
-//};
