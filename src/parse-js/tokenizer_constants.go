@@ -226,3 +226,7 @@ func ParseJsNumber(num string) *float64 {
 
 	return nil
 }
+
+func IsToken(token *Token, typ, val string) bool {
+	return token.Typ == typ && (val == "" || token.Value == val)
+}

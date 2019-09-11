@@ -12,11 +12,11 @@ var EX_EOF = "END OF FILE"
 type Tokenizer struct {
 	Text           string
 	Pos            int
-	Tokpos         int
+	TokPos         int
 	Line           int
-	Tokline        int
+	TokLine        int
 	Col            int
-	Tokcol         int
+	TokCol         int
 	NewlineBefore  bool
 	RegexAllowed   bool
 	commentsBefore []*Token
@@ -74,9 +74,9 @@ func (t *Tokenizer) Find(what string) int {
 }
 
 func (t *Tokenizer) StartToken() {
-	t.Tokline = t.Line
-	t.Tokcol = t.Col
-	t.Tokpos = t.Pos
+	t.TokLine = t.Line
+	t.TokCol = t.Col
+	t.TokPos = t.Pos
 }
 
 type Token struct {
@@ -99,9 +99,9 @@ func (t *Tokenizer) Token(tp string, value interface{}, is_comment bool) *Token 
 	ret := Token{
 		Typ:    tp,
 		Value:  value,
-		Line:   t.Tokline,
-		Col:    t.Tokcol,
-		Pos:    t.Tokpos,
+		Line:   t.TokLine,
+		Col:    t.TokCol,
+		Pos:    t.TokPos,
 		Endpos: t.Pos,
 		Nlb:    t.NewlineBefore,
 	}
